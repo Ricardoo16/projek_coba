@@ -19,7 +19,9 @@ Route::get('/', [ProductController::class, 'index'])->name('home');
 Route::get('/product/{slug}', [ProductController::class, 'show'])->name('product.detail');
 
 // Form Beli / Checkout (Bisa diakses Guest & User)
+Route::get('/checkout/{product}', [CheckoutController::class, 'create'])->name('checkout.create');
 Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+Route::get('/checkout/success/{code}', [CheckoutController::class, 'success'])->name('checkout.success');
 
 
 // ==========================================
