@@ -6,13 +6,57 @@
     <title>Warung Hijab - Katalog Utama</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="#">Warung Hijab</a>
+            <!-- Brand / Logo -->
+            <a class="navbar-brand fw-bold" href="{{ route('home') }}">Warung Hijab</a>
+
             <div>
-                <a href="/login" class="btn btn-outline-light btn-sm">Login</a>
-                <a href="/register" class="btn btn-primary btn-sm">Daftar</a>
+                @auth
+                    <!-- Dropdown User -->
+                    <div class="dropdown d-inline">
+                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            👤 {{ Auth::user()->name }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userDropdown">
+                            <!-- Edit Profil -->
+                            <li>
+                                <a class="dropdown-item" href="{{ route('profile.edit') }}">
+                                    ✏️ Edit Profil
+                                </a>
+                            </li>
+
+                            <!-- Dashboard Admin (Khusus Role Admin) -->
+                            @if(Auth::user()->role === 'admin')
+                                <li>
+                                    <a class="dropdown-item" href="{{ route('admin.products.index') }}">
+                                        🛠️ Dashboard Admin
+                                    </a>
+                                </li>
+                            @endif
+
+                            <li><hr class="dropdown-divider"></li>
+
+                            <!-- Logout -->
+                            <li>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        🚪 Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                @endauth
+
+                @guest
+                    <!-- Jika User BELUM Login: Tampilkan Tombol Login & Daftar -->
+                    <a href="{{ route('login') }}" class="btn btn-outline-light btn-sm me-1">Login</a>
+                    <a href="{{ route('register') }}" class="btn btn-primary btn-sm">Daftar</a>
+                @endguest
             </div>
         </div>
     </nav>
@@ -23,14 +67,36 @@
         <div class="row">
             @forelse($products as $product)
                 <div class="col-md-3 mb-4">
-                    <div class="card h-100">
-                        <img src="https://via.placeholder.com/300x300" class="card-img-top" alt="{{ $product->name }}">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ $product->name }}</h5>
-                            <p class="text-primary fw-bold">Rp {{ number_format($product->price, 0, ',', '.') }}</p>
-                            <p class="text-primary fw-bold">Stok: {{ $product->stock }}</p>
-                            <a href="/product/{{ $product->slug }}" class="btn btn-sm btn-outline-primary w-100">Lihat Detail</a>
-                            <a href="{{ route('checkout.create', $product->id) }}" class="btn btn-primary">Beli Sekarang</a>
+                    <div class="card h-100 shadow-sm border-0">
+                        <!-- Gambar Produk dengan Badge Sold Out jika stok 0 -->
+                        <div class="position-relative">
+                            @if($product->image)
+                                <img src="{{ asset('storage/' . $product->image) }}" class="card-img-top" alt="{{ $product->name }}" style="height: 200px; object-fit: cover;">
+                            @else
+                                <img src="https://via.placeholder.com/300x200?text=No+Image" class="card-img-top" alt="{{ $product->name }}" style="height: 200px; object-fit: cover;">
+                            @endif
+
+                            @if($product->stock <= 0)
+                                <span class="position-absolute top-0 end-0 bg-danger text-white px-3 py-1 m-2 rounded-pill fw-bold fs-7">
+                                    Sold Out
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <span class="badge bg-secondary mb-2">{{ $product->category->name ?? 'Kategori' }}</span>
+                                <h5 class="card-title fw-bold">{{ $product->name }}</h5>
+                                <p class="card-text text-primary fw-bold">Rp {{ number_format($product->price, 0, ',', '.') }}</p>
+                            </div>
+
+                            <div class="mt-3">
+                                @if($product->stock > 0)
+                                    <a href="{{ route('product.detail', $product->slug) }}" class="btn btn-outline-primary w-100">Lihat Detail</a>
+                                @else
+                                    <button class="btn btn-secondary w-100" disabled>Sold Out</button>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </div>

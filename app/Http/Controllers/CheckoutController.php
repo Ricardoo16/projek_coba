@@ -15,57 +15,67 @@ class CheckoutController extends Controller
     public function create($productId)
     {
         $product = Product::findOrFail($productId);
-        return view('frontend.checkout', compact('product'));
+            // Cek jika stok habis
+            if ($product->stock <= 0) {
+                return redirect()->route('home')->with('error', 'Maaf, produk ini telah Sold Out!');
+            }
+            return view('frontend.checkout', compact('product'));
     }
 
     // Proses Simpan Transaksi
     public function store(Request $request)
     {
         $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'customer_name' => 'required|string|max:255',
-            'customer_email' => 'required|email',
-            'customer_phone' => 'required|string',
+            'product_id'       => 'required|exists:products,id',
+            'customer_name'    => 'required|string|max:255',
+            'customer_email'   => 'required|email',
+            'customer_phone'   => 'required|string',
             'shipping_address' => 'required|string',
-            'quantity' => 'required|integer|min:1',
+            'quantity'         => 'required|integer|min:1',
         ]);
 
-        $product = Product::findOrFail($request->product_id);
-
-        if ($product->stock < $request->quantity) {
-            return back()->with('error', 'Stok barang tidak mencukupi!');
-        }
-
-        $totalPrice = $product->price * $request->quantity;
         $orderCode = 'TRX-' . strtoupper(Str::random(8));
 
-        // Gunakan Transaction agar data terisi sempurna
-        DB::transaction(function () use ($request, $product, $totalPrice, $orderCode) {
-            // 1. Simpan ke tabel orders
+        // Jalankan database transaction & simpan nilai kembalian ke variabel
+        $order = DB::transaction(function () use ($request, $orderCode) {
+            // 1. Kunci baris produk (lockForUpdate) untuk menghindari race condition stok
+            $product = Product::where('id', $request->product_id)->lockForUpdate()->firstOrFail();
+
+            // 2. Cek ketersediaan stok di dalam transaksi
+            if ($product->stock < $request->quantity) {
+                throw new \Exception('Stok barang tidak mencukupi!');
+            }
+
+            $totalPrice = $product->price * $request->quantity;
+
+            // 3. Simpan ke tabel orders
             $order = Order::create([
-                'user_id' => auth()->check() ? auth()->id() : null, // null jika Guest
-                'code' => $orderCode,
-                'customer_name' => $request->customer_name,
-                'customer_email' => $request->customer_email,
-                'customer_phone' => $request->customer_phone,
+                'user_id'          => auth()->check() ? auth()->id() : null,
+                'code'             => $orderCode,
+                'customer_name'    => $request->customer_name,
+                'customer_email'   => $request->customer_email,
+                'customer_phone'   => $request->customer_phone,
                 'shipping_address' => $request->shipping_address,
-                'total_price' => $totalPrice,
-                'status' => 'pending',
+                'total_price'      => $totalPrice,
+                'status'           => 'pending',
             ]);
 
-            // 2. Simpan rincian ke order_items
+            // 4. Simpan rincian ke order_items
             OrderItem::create([
-                'order_id' => $order->id,
+                'order_id'   => $order->id,
                 'product_id' => $product->id,
-                'quantity' => $request->quantity,
-                'price' => $product->price,
+                'quantity'   => $request->quantity,
+                'price'      => $product->price,
             ]);
 
-            // 3. Potong stok produk
+            // 5. Potong stok produk
             $product->decrement('stock', $request->quantity);
+
+            return $order;
         });
 
-        return redirect()->route('checkout.success', $orderCode);
+        return redirect()->route('checkout.success', $order->code)
+                        ->with('success', 'Pesanan berhasil dibuat!');
     }
 
     // Halaman Berhasil Transaksi
